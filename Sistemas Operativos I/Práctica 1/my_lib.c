@@ -114,27 +114,20 @@ struct my_stack*my_stack_init(int size)
 //Método que inserta nodo en la pila
 int my_stack_push (struct my_stack *stack, void *data)
 {
-    //Llamar método my_stack_init a stack para reservar espacio
-    stack = my_stack_init(sizeof(struct my_stack_node));
+   struct my_stack_node *nodo;
     //Si stack == NULL o <= se devuelve -1
     if ((stack == NULL) && (stack->size <= 0))
     {
-        //Se devuelve -1 (EXIT_FAILURE)
         return -1;
     }
-    else
+    nodo = malloc(sizeof(struct my_stack_node));
+    if (nodo == NULL)
     {
-        //Se podrá insertar el nodo
-        //Creación Nodo
-        struct my_stack_node *Nodo = malloc(sizeof(struct my_stack_node));
-        //Campo data del nodo igual al dado por parámetro
-        Nodo->data = data;
-        //Y el nodo apunta adonde apunta top
-        Nodo->next = stack->top;
-        //Y el top de la pila ahora va a apuntar al nodo insertado
-        stack->top = Nodo;
+        return -1;
     }
-    //Se devuelve 0 (EXIT_SUCCESS)
+    nodo->data = data;
+    nodo->next = stack->top - 1;
+    stack->top = nodo->next;
     return 0;
 }
 
