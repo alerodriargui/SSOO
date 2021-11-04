@@ -1,14 +1,6 @@
 #include <stdio.h>
-
-struct my_stack_node {      // nodo de la pila (elemento)
-  void *data;
-  struct my_stack_node *next;
-};
- 
-struct my_stack {   // pila
-  int size;       // tamaño de data, nos lo pasarán por parámetro
-  struct my_stack_node *top;  // apunta al nodo de la parte superior
-};
+#include <stdlib.h>
+#include "my_lib.h"
 
 size_t my_strlen(const char *str)
 {
@@ -61,9 +53,11 @@ char *my_strcpy(char *dest, const char *src)
 
 char *my_strncpy(char *dest, const char *src, size_t n)
 {
-    for(int i = 0; i < n; i++) dest[i] = src[i];
+    for (int i = 0; i < n; i++)
+    {
+        dest[i] = src[i];
+    }
     return src;
-
 }
 
 char *my_strcat(char *dest, const char *src)
@@ -75,7 +69,8 @@ char *my_strcat(char *dest, const char *src)
         tmp++;
     }
     //Adicion de src
-    while(*src!= '\0'){
+    while (*src != '\0')
+    {
         *tmp++ = *src++;
     }
     *tmp = '\0';
@@ -93,36 +88,36 @@ char *my_strchr(const char *str, int c)
             return str;
         }
     }
-    //Si no hay ninguna coincidencia se de NULL
+    //Si no hay ninguna coincidencia se devuelve NULL
     return NULL;
 }
 
-//Método que reserva espacio para variable struct my_stack
-struct my_stack*my_stack_init(int size)
+struct my_stack *my_stack_init(int size)
 {
     //Creación de variable y reserva de espacio
-    struct my_stack* Pila = malloc(sizeof(struct my_stack));
+    struct my_stack *Pila = malloc(sizeof(struct my_stack));
     //Campo size = datos pasados por parámetro
-    Pila->size=size;
+    Pila->size = size;
     //Puntero top apuntando a NULL
-    Pila->top=NULL;   
-
+    Pila->top = NULL;
     //Devolver Pila
     return Pila;
 }
 
-//Método que inserta nodo en la pila
-int my_stack_push (struct my_stack *stack, void *data)
+int my_stack_push(struct my_stack *stack, void *data)
 {
-   struct my_stack_node *nodo;
-    //Si stack == NULL o <= se devuelve -1
+    struct my_stack_node *nodo;
+    //Si el nuevo nodo esta vacio o su tamaño es <= 0 se devuelve -1
     if ((stack == NULL) && (stack->size <= 0))
     {
+        //EXIT_FAILURE
         return -1;
     }
     nodo = malloc(sizeof(struct my_stack_node));
+    //Si el nuevo nodo esta vacio se devuelve -1
     if (nodo == NULL)
     {
+        //EXIT_FAILURE
         return -1;
     }
     nodo->data = data;
@@ -131,26 +126,27 @@ int my_stack_push (struct my_stack *stack, void *data)
     return 0;
 }
 
-//Método que elimina nodo superior pila
-void *my_stack_pop (struct my_stack *stack)
+void *my_stack_pop(struct my_stack *stack)
 {
-    //Si pila vacía...
-    if(stack==NULL){
-        //Devuelve NULL
-        return NULL;
+    //Variable nodo que apunta al nodo superior de la pila pasada por parametro
+    struct my_stack_node *nodo = stack->top;
+    //Se inicializa data a devolver
+    void *data = NULL;
+    //Mientras no sea final de pila se puede sacar nodos
+    if (nodo != NULL)
+    {
+        //Se asigna la data del nodo que se retira de la pila
+        data = nodo->data;
+        //Y el nodo que había siguinete al que se retira pasa a ser
+        // el superior en la pila
+        stack->top = nodo->next;
+        //Liberamos memoria del nodo retirado
+        free(nodo);
     }
-    //Sino
-    else{
-        //Puntero pila apunta donde apunta nodo superior
-        stack->top=stack->top->next;
-        //Y nodo superior apunta ahora a NULL para desaparecer de la pila
-        stack->top->next=NULL;
-    }
-    
+    return data;
 }
 
-//Método que cuenta cuantos nodos hay
-int my_stack_len (struct my_stack *stack)
+int my_stack_len(struct my_stack *stack)
 {
     //Contador de nodos
     int len = 0;
@@ -164,7 +160,39 @@ int my_stack_len (struct my_stack *stack)
         //Siguiente nodo
         nodo = nodo->next;
     }
-    //Se devuelve el contador
+    //Se devuelve el contador nodos
     return len;
-    
+}
+
+int my_stack_purge(struct my_stack *stack)
+{
+    //Contador de nodos borrados
+    int n = 0;
+    //Variables de tipo nodo
+    struct my_stack_node *nodo = stack->top;
+    struct my_stack_node *nodoAux = NULL;
+    //Se recorre la pila hasta llegar al final
+    while (nodo != NULL)
+    {
+        //Se asigna el siguiente nodo a eliminar
+        nodoAux = nodo->next;
+        //Se libera espacio en memoria del nodo actual
+        free(nodo->data);
+        free(nodo);
+        //Se prepara siguiente nodo a borrar
+        nodo = nodoAux;
+        //Aumenta el contador
+        n++;
+    }
+    //Se libera espacio en memoria
+    free(stack);
+    return n;
+}
+
+int my_stack_write(struct my_stack *stack, char *filename)
+{
+}
+
+struct my_stack *my_stack_read(char *filename)
+{
 }
