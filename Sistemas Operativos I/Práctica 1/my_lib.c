@@ -190,7 +190,69 @@ int my_stack_purge(struct my_stack *stack)
 }
 
 int my_stack_write(struct my_stack *stack, char *filename)
-{
+{    
+    //Variables
+    int *size = &stack->size;
+    void *data = NULL;
+    int elementosEscritos = 0;
+
+    int fichero = 0;
+    int bytes = 0;
+
+    struct my_stack_node *nodo = stack->top;
+    struct my_stack *pilaAux;
+    //Inicializar pila auxiliar
+    pilaAux = my_stack_init(stack->size);
+    //Copiar pila en una auxiliar para leer del fichero en el orden correcto
+    //una vez se escriba en el fichero
+    while (nodo != NULL)
+    {
+        //Se hace un push en la pilaAux y se obtiene la pila orginal en la auxiliar
+        //en el orden inverso a la orginal
+        my_stack_push(pilaAux, nodo->data);
+        //Avanzar al siguiente nodo
+        nodo = nodo->next;
+    }
+
+    //Una vez se hace la copia de la pila, se abre el fichero
+    fichero = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    //Comprobamos si se produce algún error
+    if (fichero < 0)
+    {
+        return -1;
+    }
+    //Escribimos el numero de bytes de los datos para luego saber cuantos datos hay que leer
+    bytes = write(fichero, size, sizeof(stack->size));
+    //Miramos si se produce algun error en la escritura de los bytes
+    if (bytes != sizeof(stack->size))
+    {
+        close(fichero);
+        return -1;
+    }
+    //Asignamos a la varible nodo el primer nodo de la pilaAux
+    nodo = pilaAux->top;
+    //Se escriben los datos hasta llegar al final de la pilaAux
+    while (nodo != NULL)
+    {
+        bytes = write(fichero, nodo->data, stack->size);
+        if (bytes != stack->size)
+        {
+            close(fichero);
+            return -1;
+        }
+        //Sacamos nodo escrito de la pilaAux
+        my_stack_pop(pilaAux);
+        //Asignamos a nodo el siguiente nodo a escribir
+        nodo = pilaAux->next;
+        //Aumentamos el contador de nodos escritos
+        elementosEscritos++;
+    }
+    //Cerrmos fichero
+    close(fichero);
+    //liberamos espacio en memoria ocupado por la pilaAux
+    free(pilaAux);
+    //Se devuelve el numero de elementos escritos
+    return elementosEscritos;
 }
 
 struct my_stack *my_stack_read(char *filename)
