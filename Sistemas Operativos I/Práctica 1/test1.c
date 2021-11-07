@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 
-#include "my_lib.h"
+#include "my_lib.c"
 
 void red()
 {

@@ -9,7 +9,7 @@ manejo de una pila */
 #include <sys/stat.h>  /* Permisos función open() */
 #include <sys/types.h> /* Definiciones de tipos de datos como size_t*/
 #include <unistd.h>    /* Funciones read(), write(), close()*/
-#include "my_lib.c"
+
 //declaraciones funciones libreria string
 size_t my_strlen(const char *str);
 int my_strcmp(const char *str1, const char *str2);

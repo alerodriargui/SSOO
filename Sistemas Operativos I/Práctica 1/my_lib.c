@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include "my_lib.h"
 
+/*
+Miembros del grupo:
+    Sergi Mayol Matos
+    Alejandro Rodríguez Arguimbau 
+    Nicolás Sanz Tuñón
+*/
+
 size_t my_strlen(const char *str)
 {
     size_t len = 0;
@@ -40,24 +47,27 @@ int my_strcmp(const char *str1, const char *str2)
 
 char *my_strcpy(char *dest, const char *src)
 {
-    char *tmp = dest;
-
-    while (*dest = *src)
+    int i;
+    //Se copia el str hasta llegar al final
+    for (i = 0; src[i] != '\0'; i++)
     {
-        dest++;
-        src++;
+        dest[i] = src[i];
     }
-
-    return tmp;
+    //Adicion final str al dest
+    dest[i] = '\0';
+    //Se devuelve
+    return dest;
 }
 
 char *my_strncpy(char *dest, const char *src, size_t n)
 {
+    //Se copia el str hasta que sea menor que n
     for (int i = 0; i < n; i++)
     {
         dest[i] = src[i];
     }
-    return src;
+    //Se devuelve
+    return dest;
 }
 
 char *my_strcat(char *dest, const char *src)
@@ -85,7 +95,7 @@ char *my_strchr(const char *str, int c)
         //Si coinciden se devuelve el resto de la frase
         if (*str == (char)c)
         {
-            return str;
+            return (char *)str;
         }
     }
     //Si no hay ninguna coincidencia se devuelve NULL
@@ -106,24 +116,34 @@ struct my_stack *my_stack_init(int size)
 
 int my_stack_push(struct my_stack *stack, void *data)
 {
+    //Variables
     struct my_stack_node *nodo;
-    //Si el nuevo nodo esta vacio o su tamaño es <= 0 se devuelve -1
-    if ((stack == NULL) && (stack->size <= 0))
-    {
-        //EXIT_FAILURE
-        return -1;
-    }
+    //Se reserva espacio para el nuevo nodo
     nodo = malloc(sizeof(struct my_stack_node));
-    //Si el nuevo nodo esta vacio se devuelve -1
-    if (nodo == NULL)
+    //Se asigna la data correspondiente al nodo
+    nodo->data = data;
+    //Si la pila no esta vacia y su tamaño es mayor que 0 se
+    // prodece a añadir el nuevo nodo
+    if ((stack != NULL) && (stack->size > 0))
     {
-        //EXIT_FAILURE
+        if (stack->top == NULL)
+        {
+            stack->top = nodo;
+            nodo->next = NULL;
+        }
+        else
+        {
+            nodo->next = stack->top;
+            stack->top = nodo;
+        }
+        //No ha ocurrido ningun fallo
+        return 0;
+    }
+    else
+    {
+        //Se ha producido algun error
         return -1;
     }
-    nodo->data = data;
-    nodo->next = stack->top - 1;
-    stack->top = nodo->next;
-    return 0;
 }
 
 void *my_stack_pop(struct my_stack *stack)
@@ -133,16 +153,17 @@ void *my_stack_pop(struct my_stack *stack)
     //Se inicializa data a devolver
     void *data = NULL;
     //Mientras no sea final de pila se puede sacar nodos
-    if (nodo != NULL)
+    if (nodo == NULL)
     {
-        //Se asigna la data del nodo que se retira de la pila
-        data = nodo->data;
-        //Y el nodo que había siguinete al que se retira pasa a ser
-        // el superior en la pila
-        stack->top = nodo->next;
-        //Liberamos memoria del nodo retirado
-        free(nodo);
+        return NULL;
     }
+    //Y el nodo que había siguiente al que se retira pasa a ser
+    // el superior en la pila
+    stack->top = nodo->next;
+    //Se asigna la data del nodo que se retira de la pila
+    data = nodo->data;
+    //Liberamos memoria del nodo retirado
+    free(nodo);
     return data;
 }
 
@@ -166,109 +187,118 @@ int my_stack_len(struct my_stack *stack)
 
 int my_stack_purge(struct my_stack *stack)
 {
-    //Contador de nodos borrados
-    int n = 0;
-    //Variables de tipo nodo
-    struct my_stack_node *nodo = stack->top;
-    struct my_stack_node *nodoAux = NULL;
-    //Se recorre la pila hasta llegar al final
-    while (nodo != NULL)
+    //Numero de bytes que ocupa la pila
+    int bytesLiberados = sizeof(struct my_stack);
+    //Se libera el espacio en memoria hasta llegar al final
+    while (stack->top != NULL)
     {
-        //Se asigna el siguiente nodo a eliminar
-        nodoAux = nodo->next;
-        //Se libera espacio en memoria del nodo actual
-        free(nodo->data);
-        free(nodo);
-        //Se prepara siguiente nodo a borrar
-        nodo = nodoAux;
-        //Aumenta el contador
-        n++;
+        //Espacio que ocupa el nodo
+        bytesLiberados += sizeof(struct my_stack_node);
+        //Espacio que ocupan los datos
+        bytesLiberados += stack->size;
+        //Con pop sabemos la posicion del espacio en memoria que se tiene que liberar
+        free(my_stack_pop(stack));
     }
-    //Se libera espacio en memoria
+    //Se libera espacio en memoria ocupado por el stack
     free(stack);
-    return n;
+    return bytesLiberados;
+}
+
+//Función que recorre la pila nodo a nodo hasta el final y va escribiendo en fichero
+void escrituraNodosRecursiva(struct my_stack_node *nodo, int fichero, int size)
+{
+    //Se escribe el nodo
+    if (write(fichero, nodo->data, size) == -1)
+    {
+        //Si se produce algun fallo/error se vuelve
+        return;
+    }
+    //Si el siguiente nodo al actual no es el final se escribe en el fichero
+    if (nodo->next != NULL)
+    {
+        //Se escribe el siguiente nodo llamando a la funcion
+        escrituraNodosRecursiva(nodo->next, fichero, size);
+    }
 }
 
 int my_stack_write(struct my_stack *stack, char *filename)
 {
-        //Variables
-    int *size = &stack->size;
-    void *data = NULL;
-    int elementosEscritos = 0;
+    //Variables
+    int size;
+    int fichero;
+    struct my_stack_node *nodo;
 
-    int fichero = 0;
-    int bytes = 0;
-
-    struct my_stack_node *nodo = stack->top;
-    struct my_stack *pilaAux;
-    //Inicializar pila auxiliar
-    pilaAux = my_stack_init(stack->size);
-    //Copiar pila en una auxiliar para leer del fichero en el orden correcto
-    //una vez se escriba en el fichero
-    while (nodo != NULL)
-    {
-        //Se hace un push en la pilaAux y se obtiene la pila orginal en la auxiliar
-        //en el orden inverso a la orginal
-        my_stack_push(pilaAux, nodo->data);
-        //Avanzar al siguiente nodo
-        nodo = nodo->next;
-    }
-
-    //Una vez se hace la copia de la pila, se abre el fichero
+    //Nodo que apunta al nodo superior de la pila
+    nodo = stack->top;
+    //Se abre el enlace con el fichero a escribir dando los permisos correspondientes
     fichero = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-    //Comprobamos si se produce algún error
-    if (fichero < 0)
+    //Se asigna el tamaño de la pila
+    size = stack->size;
+    //Comprobacion de posible fallo en apertura de fichero
+    if (fichero == -1)
     {
+        //Si se produce algun fallo/error se devuelve -1
         return -1;
     }
-    //Escribimos el numero de bytes de los datos para luego saber cuantos datos hay que leer
-    bytes = write(fichero, size, sizeof(stack->size));
-    //Miramos si se produce algun error en la escritura de los bytes
-    if (bytes != sizeof(stack->size))
+    //Comprobacion de posible fallo en la escritura en el fichero
+    if (write(fichero, &stack->size, sizeof(size)) == -1)
     {
-        close(fichero);
+        //Si se produce algun fallo/error se devuelve -1
         return -1;
     }
-    //Asignamos a la varible nodo el primer nodo de la pilaAux
-    nodo = pilaAux->top;
-    //Se escriben los datos hasta llegar al final de la pilaAux
-    while (nodo != NULL)
-    {
-        bytes = write(fichero, nodo->data, stack->size);
-        if (bytes != stack->size)
-        {
-            close(fichero);
-            return -1;
-        }
-        //Sacamos nodo escrito de la pilaAux
-        my_stack_pop(pilaAux);
-        //Asignamos a nodo el siguiente nodo a escribir
-        nodo = pilaAux->top;
-        //Aumentamos el contador de nodos escritos
-        elementosEscritos++;
-    }
-    //Cerrmos fichero
+    //Se escribe nodo a nodo en el fichero de manera ordenada, para ello se debe escribir
+    // de manera inversa los nodos de la pila.
+    escrituraNodosRecursiva(nodo, fichero, size);
+    //Cierre enlace fichero
     close(fichero);
-    //liberamos espacio en memoria ocupado por la pilaAux
-    free(pilaAux);
-    //Se devuelve el numero de elementos escritos
-    return elementosEscritos;
+    //Se devuelve la longitud de la pila
+    return my_stack_len(stack);
 }
 
 struct my_stack *my_stack_read(char *filename)
 {
-    int file;
-    file = open(filename, O_RDONLY);
+    //Variables
+    int fichero;
+    int size;
+    int bytes;
+    void *datos;
     struct my_stack *pila;
-    pila = my_stack_init(sizeof(struct my_stack));
 
-    if(file==-1){
-        printf("No se ha podido abrir el archivo");
+    //Se abre el enlace con el fichero a leer dando los permisos correspondientes
+    fichero = open(filename, O_RDONLY, S_IRUSR);
+    //Comprobacion de posible fallo en apertura de fichero
+    if (fichero == -1)
+    {
+        //Si se produce algun fallo/error se devuelve NULL
+        return NULL;
     }
-
-    else{
-        read(file, pila, 4);
+    //Se hace una lectura para obtener el tamaño de los datos a leer
+    bytes = read(fichero, &size, sizeof(int));
+    //Comprobacion de posible fallo en la lectura del fichero
+    if (bytes == -1)
+    {
+        //Si se produce algun fallo/error se devuelve NULL
+        return NULL;
     }
-
-
+    //Se inicializa la pila
+    pila = my_stack_init(size);
+    //Se asigna a datos el espacio en memoria del tamaño de la pila
+    datos = malloc(pila->size);
+    //Leemos del fichero la cantidad de datos
+    bytes = read(fichero, datos, pila->size);
+    while (bytes == pila->size)
+    {
+        //Se hace un push en la pila con los datos obtenidos en lectura
+        my_stack_push(pila, datos);
+        //Se asigna a datos el tamaño de la pila
+        datos = malloc(pila->size);
+        //Se lee siguiente
+        bytes = read(fichero, datos, pila->size);
+    }
+    //Se libera espacio en memoria ocupado por datos
+    free(datos);
+    //Cierre enlace fichero
+    close(fichero);
+    //Se devuelve la pila con los nodos leidos
+    return pila;
 }
