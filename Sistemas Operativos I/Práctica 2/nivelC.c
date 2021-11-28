@@ -329,14 +329,45 @@ int is_background(char**args){
     return 0;
 }
 
+//Añade trabajos a la array si no se ha llegado a la cantidad
+//máxima de trabajos permitidos (N_JOBS)
 int jobs_list_add(pid_t pid, char status, char *cmd){
+    //Si no se ha llegado al nº máximo de trabajos permitidos...
     if(n_pids < N_JOBS){
+        //Se suma 1 a la variable global n_pids
         n_pids++;
+        //Y se añade el trabajo dado por parámetros a la array
         jobs_list[n_pids].pid=pid;
         jobs_list[n_pids].status=status;
         strcpy(jobs_list[n_pids.cmd], cmd);
-        return 0;
     }
+    return 0;
+}
+
+//Busca el pid dado por parámetro en el array de trabajos y 
+//devuelve su posición
+int jobs_list_find(pid_t pid){
+    int pos_pid;
+
+    //Se recorre hasta encontrar el pid dado en la array
+    for(pos_pid=0; jobs_list[pos_pid].pid != pid; pos_pid++){     
+    }
+    //Y se devuelve la posición
+    return pos_pid;
+}
+
+//Elimina el trabajo de la posición dada por parámetro de la array
+int jobs_list_remove(int pos){
+    //Si la pos dada se situa en la array actual de trabajos
+    if(pos<pos_pid){
+        //Se mueve los registros del último elemento de la lista
+        //al de la posición dada
+        jobs_list[pos] = jobs_list[n_pids];
+        //Y como se ha eliminado un trabajo,
+        //se decrementa n_pids
+        n_pids--;
+    }
+    return 0;
 }
 
 int main(int argc, char *argv[])
