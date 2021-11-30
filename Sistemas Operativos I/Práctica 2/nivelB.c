@@ -285,7 +285,7 @@ void ctrlc(int signum)
             //Enviar la señal SIGTERM y notificarlo por pantalla.
             fprintf(stderr, "[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
                     getpid(), mi_shell, jobs_list[0].pid, jobs_list[0].cmd);
-            printf("[ctrlc()→ Señal %d enviada a %d(%s) por %d(%s)]", SIGTERM, jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell;
+            printf("[ctrlc()→ Señal %d enviada a %d(%s) por %d(%s)]", SIGTERM, jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell);
             kill(jobs_list[0].pid, SIGTERM);
         }
         else
