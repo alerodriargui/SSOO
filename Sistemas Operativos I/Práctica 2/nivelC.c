@@ -275,36 +275,51 @@ void reaper(int signum)
     // Analizamos el valor de waitpid para saber que hijo termina
     while ((ended = waitpid(-1, &status, WNOHANG)) > 0)
     {
-        if (ended == jobs_list[0].pid)
+        if (ended == jobs_list[0].pid) // Foreground
         {
+            if (WIFEXITED(status))
+            {
+                fprintf(stderr, "\n[reaper()→ Proceso hijo %d en foreground (%s) "
+                                "finalizado con exit code %d]\n",
+                        jobs_list[0].pid, jobs_list[0].command_line, WEXITSTATUS(status));
+            }
+            else if (WIFSIGNALED(status))
+            {
+                fprintf(stderr, "\n[reaper()→ Proceso hijo %d en foreground (%s) "
+                                "finalizado por señal %d]\n",
+                        ended, jobs_list[0].command_line, WTERMSIG(status));
+            }
             jobs_list[0].pid = 0;
             jobs_list[0].status = 'F';
-            strcpy(cmdline, jobs_list[0].command_line);
-            fprintf(stderr, "\n[reaper()→ Proceso en foreground finalizado]\n
-            [reaper()→ Enterrado proceso con PID %d(%s)]\n", ended, jobs_list[0].command_line);
-            memset(jobs_list[0].command_line, 0, COMMAND_LINE_SIZE);
+            strcpy(jobs_list[0].command_line, "");
         }
-        else
+        else // Background
         {
             posFinal = jobs_list_find(ended);
-            fprintf(stderr, "\n[reaper()→ Proceso en background finalizado]\n
-            [reaper()→ Enterrado proceso con PID %d(%s)]\n", ended, jobs_list[posFinal].command_line);
-            jobs_list_remove(posFinal);
+            if (posFinal)
+            {
+                if (WIFEXITED(status))
+                {
+                    fprintf(stderr, "\n[reaper()→ Proceso hijo %d en background (%s) "
+                                    "finalizado con exit code %d]\n",
+                            ended, jobs_list[posFinal].command_line, WEXITSTATUS(status));
+                    fflush(stderr);
+                }
+                else if (WIFSIGNALED(status))
+                {
+                    fprintf(stderr, "\n[reaper()→ Proceso hijo %d en background (%s) "
+                                    "finalizado por señal %d]\n",
+                            ended, jobs_list[posFinal].command_line, WTERMSIG(status));
+                    fflush(stderr);
+                }
+                fprintf(stderr, "\nTerminado PID %d (%s) en jobs_list[%d] con estatus %d\n",
+                        jobs_list[posFinal].pid,
+                        jobs_list[posFinal].command_line,
+                        posFinal, status);
+                jobs_list_remove(posFinal);
+                fflush(stderr);
+            }
         }
-        /*
-        // En este nivel mostraremos un mensaje indicando el PID del hijo que ha finalizado y si ha sido por una señal.
-        if (WIFEXITED(status))
-        {
-            fprintf(stderr, "\n[reaper()→ Proceso hijo %d(%s) finalizado con exit code %d]\n", ended, jobs_list[0].cmd, WEXITSTATUS(status));
-        }
-        else if (WIFSIGNALED(status))
-        {
-            fprintf(stderr, "[reaper()→ Proceso hijo %d(%s) finalizado por señal %d]\n", ended, jobs_list[0].cmd, WTERMSIG(status));
-        }
-        // Reseteo de jobs_list
-        jobs_list[0].pid = 0;
-        jobs_list[0].status = 'F';
-        strcpy(jobs_list[0].cmd, "");*/
     }
 }
 
@@ -427,10 +442,12 @@ void ctrlz(int signum)
 
 int main(int argc, char *argv[])
 {
-    // llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
+    // Llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
     signal(SIGCHLD, reaper);
     // SIGINT es la señal de interrupción que produce Ctrl+C
     signal(SIGINT, ctrlc);
+    // SIGTSTP es la señal de interrupción que produce Ctrl+Z
+    signal(SIGTSTP, ctrlz);
     // Obtenemos nombre del programa y lo guardamos en mi_shell
     strcpy(mi_shell, argv[0]);
     // Inicializacion de jobs_list[0] con pid = 0 status = 'N' y el cmd todo a '\0'
