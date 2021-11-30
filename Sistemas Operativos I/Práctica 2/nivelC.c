@@ -115,7 +115,7 @@ int internal_jobs(char **args)
         printf("[%d] %d\t%c\t%s\n", i, jobs_list[i].pid, jobs_list[i].status,
                jobs_list[i].cmd);
     }
-    printf("[internal_jobs()→ Esta función mostrará el PID de los procesos que no estén en foreground]\n");
+    fprintf(stderr, "[internal_jobs()→ Esta función mostrará el PID de los procesos que no estén en foreground]\n");
     return 0;
 }
 
