@@ -55,6 +55,8 @@ char *read_line(char *line);
 int parse_args(char **args, char *line);
 int execute_line(char *line);
 
+
+
 static char mi_shell[COMMAND_LINE_SIZE]; // variable global para guardar el nombre del minishell
 int n_pids = 0;
 
@@ -202,9 +204,66 @@ int parse_args(char **args, char *line)
 
 int execute_line(char *line)
 {
-    // TODO: falta hacer este método, para ello:
-    //? Copiar del github
-    //! Vacio temporalmente para saber cual falta
+    char *args[ARGS_SIZE];
+    pid_t pid, status;
+    char command_line[COMMAND_LINE_SIZE];
+
+    //copiamos la línea de comandos sin '\n' para guardarlo en el array de structs de los procesos
+    memset(command_line, '\0', sizeof(command_line));
+    strcpy(command_line, line); //antes de llamar a parse_args() que modifica line
+    //Comprobar si tenemos argumentos en nuestro comando
+    if (parse_args(args, line) > 0)
+    {
+        //Se identifica si se trata de un comando interno o externo
+        if (!check_internal(args))
+        {
+            fprintf(stderr, "[execute_line()→ PID padre: %d (%s)]\n", getpid(), mi_shell);
+            int compr_background;
+            //Comprobar background para saber si hay & al final de la línea de comandos
+            compr_background = is_background(args);
+            //Se crea un hijo con fork(), para que se encargue de que se ejecute el comando de forma externa.
+            pid = fork();
+            //Proceso hijo
+            if (pid == 0)
+            {
+                //Asociar la acción por defecto a SIGCHLD
+                signal(SIGCHLD, SIG_DFL);
+                //Ignora la señal SIGINT
+                signal(SIGINT, SIG_IGN);
+                //Ignora la señal SIGTSTP
+                signal(SIGTSTP, SIG_IGN);
+                fprintf(stderr, "[execute_line()→ PID hijo: %d(%s)]\n", getpid(), args[0]);
+                execvp(args[0], args);
+                fprintf(stderr, "%s: no se encontró la orden\n", line);
+                exit(-1);
+            }
+            else if (pid > 0) //Proceso padre
+            {
+                //Si comando se ejecuta en foreground...
+                if(compr_background==0){
+                    fprintf(stderr, "[execute_line()→ PID padre: %d(%s)]\n", getpid(), mi_shell);
+                    jobs_list[0].pid = pid;
+                    jobs_list[0].status = 'E'; // Proceso en ejecución
+                    while (jobs_list[0].pid != 0)
+                    {
+                         pause();
+                    }
+                }
+                //Si comando se ejecuta en background...
+                else{
+                     //Se incorpora a la lista de trabajos
+                     //(en el caso de error, la propia instrucción ya indicará que la lista está llena)
+                     jobs_list_add(jobs_list[n_pids].pid, jobs_list[n_pids].status, jobs_list[n_pids].cmd);
+                }
+            }
+            else
+            {
+                fprintf(stderr, "Error %d: %s\n", errno, strerror(errno));
+                //perror("Fork");
+            }
+        }
+    }
+    return 0;
 }
 
 // Manejador propio para la señal SIGCHLD (señal enviada a un proceso cuando uno
