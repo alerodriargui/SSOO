@@ -253,7 +253,7 @@ int execute_line(char *line)
                 else{
                      //Se incorpora a la lista de trabajos
                      //(en el caso de error, la propia instrucción ya indicará que la lista está llena)
-                     jobs_list_add(jobs_list[n_pids].pid, jobs_list[n_pids].status, jobs_list[n_pids].cmd);
+                     jobs_list_add(pid, 'E', command_line);
                 }
             }
             else
