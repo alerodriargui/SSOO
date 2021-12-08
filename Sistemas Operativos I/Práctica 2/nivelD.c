@@ -128,9 +128,8 @@ int internal_jobs(char **args)
 
 int internal_fg(char **args)
 {
-    int pos;
     // Se pasa de char a int para pos
-    pos = atoi(args);
+    int pos = atoi(args[1]);
     // Si pos mayor o igual que n_pids o pos igual a 0
     if (pos >= n_pids || pos == 0)
     {
@@ -179,14 +178,13 @@ int internal_fg(char **args)
 
 int internal_bg(char **args)
 {
-    int pos;
     // Se pasa de char a int para pos
-    pos = atoi(args);
+    int pos = atoi(args[1]);
     // Si pos mayor o igual que n_pids o pos igual a 0
     if (pos >= n_pids || pos == 0)
     {
         // Entonces no existe el trabajo
-        fprintf(stderr, ": no existe ese trabajo");
+        fprintf(stderr, ": no existe ese trabajo \n");
         // Salir
         exit(-1);
     }
@@ -195,7 +193,7 @@ int internal_bg(char **args)
     if (jobs_list[pos].status == 'E')
     {
 
-        fprintf(stderr, "el trabajo ya esta en segundo plano", args[1]);
+        fprintf(stderr, "el trabajo ya esta en segundo plano \n");
     }
     // Sino
     else
