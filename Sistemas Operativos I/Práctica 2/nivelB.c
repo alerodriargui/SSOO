@@ -209,7 +209,6 @@ int execute_line(char *line) //! no finalizado falta Asociar el manejador ctrlc 
         //Se identifica si se trata de un comando interno o externo
         if (!check_internal(args))
         {
-            fprintf(stderr, "[execute_line()→ PID padre: %d (%s)]\n", getpid(), mi_shell);
             //Se crea un hijo con fork(), para que se encargue de que se ejecute el comando de forma externa.
             pid = fork();
             //Proceso hijo

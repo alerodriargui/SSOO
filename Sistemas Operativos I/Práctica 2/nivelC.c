@@ -55,10 +55,16 @@ char *read_line(char *line);
 int parse_args(char **args, char *line);
 int execute_line(char *line);
 
-
+void reaper(int signum);
+void ctrlc(int signum);
+int is_background(char **args);
+int jobs_list_add(pid_t pid, char status, char *cmd);
+int jobs_list_find(pid_t pid);
+int jobs_list_remove(int pos);
+void ctrlz(int signum);
 
 static char mi_shell[COMMAND_LINE_SIZE]; // variable global para guardar el nombre del minishell
-int n_pids = 0;
+int n_pids = 1;
 
 // static pid_t foreground_pid = 0;
 struct info_process
@@ -114,10 +120,8 @@ int internal_jobs(char **args)
     for (int i = 1; i < n_pids; i++)
     {
         // Imprime cada elemento
-        printf("[%d] %d\t%c\t%s\n", i, jobs_list[i].pid, jobs_list[i].status,
-               jobs_list[i].cmd);
+        printf("[%d] %d\t%c\t%s\n", i, jobs_list[i].pid, jobs_list[i].status, jobs_list[i].cmd);
     }
-    fprintf(stderr, "[internal_jobs()→ Esta función mostrará el PID de los procesos que no estén en foreground]\n");
     return 0;
 }
 
@@ -179,25 +183,24 @@ char *read_line(char *line)
 int parse_args(char **args, char *line)
 {
     int i = 0;
-
     args[i] = strtok(line, " \t\n\r");
-#if DEBUGN1
-    fprintf(stderr, GRIS "[parse_args()→ token %i: %s]\n" RESET_FORMATO, i, args[i]);
-#endif
+    /*#if DEBUGN1
+        fprintf(stderr, GRIS "[parse_args()→ token %i: %s]\n" RESET_FORMATO, i, args[i]);
+    #endif*/
     while (args[i] && args[i][0] != '#')
     { // args[i]!= NULL && *args[i]!='#'
         i++;
         args[i] = strtok(NULL, " \t\n\r");
-#if DEBUGN1
-        fprintf(stderr, GRIS "[parse_args()→ token %i: %s]\n" RESET_FORMATO, i, args[i]);
-#endif
+        /*#if DEBUGN1
+                fprintf(stderr, GRIS "[parse_args()→ token %i: %s]\n" RESET_FORMATO, i, args[i]);
+        #endif*/
     }
     if (args[i])
     {
         args[i] = NULL; // por si el último token es el símbolo comentario
-#if DEBUGN1
-        fprintf(stderr, GRIS "[parse_args()→ token %i corregido: %s]\n" RESET_FORMATO, i, args[i]);
-#endif
+        /*#if DEBUGN1
+                fprintf(stderr, GRIS "[parse_args()→ token %i corregido: %s]\n" RESET_FORMATO, i, args[i]);
+        #endif*/
     }
     return i;
 }
@@ -205,61 +208,56 @@ int parse_args(char **args, char *line)
 int execute_line(char *line)
 {
     char *args[ARGS_SIZE];
-    pid_t pid, status;
+    pid_t pid;
+    int background;
     char command_line[COMMAND_LINE_SIZE];
 
-    //copiamos la línea de comandos sin '\n' para guardarlo en el array de structs de los procesos
+    // copiamos la línea de comandos sin '\n' para guardarlo en el array de structs de los procesos
     memset(command_line, '\0', sizeof(command_line));
-    strcpy(command_line, line); //antes de llamar a parse_args() que modifica line
-    //Comprobar si tenemos argumentos en nuestro comando
+    strcpy(command_line, line); // antes de llamar a parse_args() que modifica line
+    // Comprobar si tenemos argumentos en nuestro comando
     if (parse_args(args, line) > 0)
     {
-        //Se identifica si se trata de un comando interno o externo
-        if (!check_internal(args))
+        // Se identifica si se trata de un comando interno o externo
+        if (args[0] && !check_internal(args))
         {
-            fprintf(stderr, "[execute_line()→ PID padre: %d (%s)]\n", getpid(), mi_shell);
-            int compr_background;
-            //Comprobar background para saber si hay & al final de la línea de comandos
-            compr_background = is_background(args);
-            //Se crea un hijo con fork(), para que se encargue de que se ejecute el comando de forma externa.
+            // Se llama a la función is_background para analizar si en la línea de comandos hay un & al final
+            background = is_background(args);
+            // Se crea un hijo con fork(), para que se encargue de que se ejecute el comando de forma externa.
             pid = fork();
-            //Proceso hijo
+            // Proceso hijo
             if (pid == 0)
             {
-                //Asociar la acción por defecto a SIGCHLD
+                // Asociar la acción por defecto a SIGCHLD
                 signal(SIGCHLD, SIG_DFL);
-                //Ignora la señal SIGINT
+                // Ignora la señal SIGINT
                 signal(SIGINT, SIG_IGN);
-                //Ignora la señal SIGTSTP
-                signal(SIGTSTP, SIG_IGN);
-                fprintf(stderr, "[execute_line()→ PID hijo: %d(%s)]\n", getpid(), args[0]);
                 execvp(args[0], args);
-                fprintf(stderr, "%s: no se encontró la orden\n", line);
                 exit(-1);
             }
-            else if (pid > 0) //Proceso padre
+            else if (pid > 0) // Proceso padre
             {
-                //Si comando se ejecuta en foreground...
-                if(compr_background==0){
-                    fprintf(stderr, "[execute_line()→ PID padre: %d(%s)]\n", getpid(), mi_shell);
+                fprintf(stderr, "[execute_line()→ PID padre: %d(%s)]\n", getpid(), mi_shell);
+                fprintf(stderr, "[execute_line()→ PID hijo: %d(%s)]\n", pid, command_line);
+                if (background) // Background
+                {
+                    // Se incopora el comando a la lista de trabajos
+                    jobs_list_add(pid, 'E', command_line);
+                }
+                else // Foreground
+                {
                     jobs_list[0].pid = pid;
                     jobs_list[0].status = 'E'; // Proceso en ejecución
+                    strcpy(jobs_list[0].cmd, command_line);
                     while (jobs_list[0].pid != 0)
                     {
-                         pause();
+                        pause();
                     }
-                }
-                //Si comando se ejecuta en background...
-                else{
-                     //Se incorpora a la lista de trabajos
-                     //(en el caso de error, la propia instrucción ya indicará que la lista está llena)
-                     jobs_list_add(pid, 'E', command_line);
                 }
             }
             else
             {
                 fprintf(stderr, "Error %d: %s\n", errno, strerror(errno));
-                //perror("Fork");
             }
         }
     }
@@ -338,17 +336,17 @@ void ctrlc(int signum)
         if (strcmp(jobs_list[0].cmd, mi_shell))
         {
             // Enviar la señal SIGTERM y notificarlo por pantalla.
-            fprintf(stderr, "[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
+            fprintf(stderr, "\n[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
                     getpid(), mi_shell, jobs_list[0].pid, jobs_list[0].cmd);
-            printf("[ctrlc()→ Señal %d enviada a %d(%s) por %d(%s)]", SIGTERM, jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell);
+            fprintf(stderr, "[ctrlc()→ Señal %d (SIGTERM) enviada a %d(%s) por %d(%s)]", SIGTERM, jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell);
             kill(jobs_list[0].pid, SIGTERM);
         }
         else
         {
             // Informar del proceso y del error producido
-            fprintf(stderr, "[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
+            fprintf(stderr, "\n[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
                     getpid(), mi_shell, jobs_list[0].pid, jobs_list[0].cmd);
-            fprintf(stderr, "[ctrlc()→ Señal %d no enviada por %d(%s) debido a que su proceso en foreground es el shell]",
+            fprintf(stderr, "[ctrlc()→ Señal %d (SIGTERM) no enviada por %d(%s) debido a que su proceso en foreground es el shell]",
                     SIGTERM, getpid(), mi_shell);
         }
     }
@@ -397,9 +395,11 @@ int jobs_list_add(pid_t pid, char status, char *cmd)
         jobs_list[n_pids].pid = pid;
         jobs_list[n_pids].status = status;
         strcpy(jobs_list[n_pids].cmd, cmd);
+        printf("[%d]\t%d\t%c\t%s\n", n_pids, jobs_list[n_pids].pid, jobs_list[n_pids].status,
+               jobs_list[n_pids].cmd);
         // Se suma 1 a la variable global n_pids
         n_pids++;
-        return 0;
+        return n_pids;
     }
     fprintf(stderr, "Se ha alcanzado el nº máximo de trabajos permitidos\n");
     return -1;
@@ -426,14 +426,21 @@ int jobs_list_find(pid_t pid)
 int jobs_list_remove(int pos)
 {
     // Si la pos dada se situa en la array actual de trabajos
-    if (pos <= n_pids)
+    if (pos < n_pids)
     {
-        // Se mueve los registros del último elemento de la lista
-        // al de la posición dada
-        jobs_list[pos] = jobs_list[n_pids];
         // Y como se ha eliminado un trabajo,
         // se decrementa n_pids
         n_pids--;
+        // Se mueve los registros del último elemento de la lista
+        // al de la posición dada
+        jobs_list[pos] = jobs_list[n_pids];
+        /*jobs_list[pos].pid = jobs_list[n_pids].pid;
+        jobs_list[pos].status = jobs_list[n_pids].status;
+        strcpy(jobs_list[pos].command_line, jobs_list[n_pids].command_line)*/
+    }
+    else
+    {
+        return -1;
     }
     return 0;
 }
@@ -443,14 +450,15 @@ void ctrlz(int signum)
 {
     // Asociamos ctrlz a SIGTSTP
     signal(SIGTSTP, ctrlz);
-    printf("\n[ctrlc()→ Soy el proceso con PID %d, el proceso en foreground es %d(%s)]\n", getpid(), jobs_list[0].pid, jobs_list[0].cmd);
+    fprintf(stderr, "\n[ctrlz()→ Soy el proceso con PID %d, el proceso en foreground es %d(%s)]\n", getpid(), jobs_list[0].pid, jobs_list[0].cmd);
     if (jobs_list[0].pid > 0)
     {
         if (strcmp(jobs_list[0].cmd, mi_shell))
         {
             // Envio señal SIGTSTP e informar
             kill(jobs_list[0].pid, SIGTSTP);
-            fprintf(stderr, "\n[ctrlz()→ Señal SIGSTOP enviada a PID: %d(%s)\n", jobs_list[0].pid, jobs_list[0].cmd);
+            fprintf(stderr, "[ctrlz()→ Señal %d (SIGSTOP) enviada a %d (%s) por %d(%s)]\n", signum,
+                    jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell);
             // Cambiar el status del proceso a 'D' (detenido).
             jobs_list[0].status = 'D';
             // Añadir los datos del proceso detenido a jobs_list[n_pids].
@@ -459,8 +467,6 @@ void ctrlz(int signum)
             jobs_list[0].pid = 0;
             jobs_list[0].status = 'F';
             strcpy(jobs_list[0].cmd, "");
-            // Mensaje de info.
-            fprintf(stderr, "[ctrlz()→ Señal %d enviada a %d(%s) por %d(%s)]\n", signum, jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell);
         }
         else
         {
