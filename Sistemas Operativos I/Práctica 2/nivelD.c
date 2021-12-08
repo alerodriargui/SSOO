@@ -126,104 +126,112 @@ int internal_jobs(char **args)
     return 0;
 }
 
-int internal_fg(char **args)
+// Añade el carácter '&' de la linea
+char *add_and(char *str)
 {
-    // Se pasa de char a int para pos
-    int pos = atoi(args[1]);
-    // Si pos mayor o igual que n_pids o pos igual a 0
-    if (pos >= n_pids || pos == 0)
+    char *aux = malloc(strlen(str) + 2);
+    for (int i = 0; i < strlen(str); i++)
     {
-        // Entonces no existe el trabajo
-        fprintf(stderr, ": no existe ese trabajo");
+        aux[i] = str[i];
     }
-
-    // Si el status del trabajo es 'D' (está detenido)
-    if (jobs_list[pos].status == 'D')
-    {
-        // Se le hace continuar y su status pasa a 'E'
-        kill(jobs_list[pos].pid, SIGCONT);
-        jobs_list[pos].status = 'E';
-
-        printf("[internal_fg()→ señal SIGCONT enviada a %d]\n", jobs_list[pos].pid);
-    }
-
-    // Se recorre hasta el final o encontrar '&'
-    for (int i = 0; jobs_list[pos].cmd[i] != 0 &&
-                    jobs_list[pos].cmd[i] != '&';
-         i++)
-    {
-
-        // Si hay '&'
-        if (jobs_list[pos].cmd[i] == '&')
-        {
-            // Se elimina el '&'
-            jobs_list[pos].cmd[i - 1] = 0;
-        }
-    }
-    // Copiar datos a jobs_list[0]
-    jobs_list[0] = jobs_list[pos];
-    // Eliminación jobs_list[pos]
-    jobs_list_remove(pos);
-    printf("%s\n", jobs_list[0].cmd);
-
-    // Mientras haya un proceso en ejecución en foreground
-    while (jobs_list[0].pid != 0)
-    {
-        // Ejecutar un pause()
-        pause();
-    }
-
-    return 1;
+    aux[strlen(str)] = ' ';
+    aux[strlen(str) + 1] = '&';
+    return aux;
 }
 
-int internal_bg(char **args)
+// Quita el carácter '&' de la linea
+char *remove_and(char *str)
 {
-    // Se pasa de char a int para pos
-    int pos = atoi(args[1]);
-    // Si pos mayor o igual que n_pids o pos igual a 0
-    if (pos >= n_pids || pos == 0)
+    char *aux = malloc(strlen(str));
+    for (int i = 0; i < strlen(str); i++)
     {
-        // Entonces no existe el trabajo
-        fprintf(stderr, ": no existe ese trabajo \n");
-        // Salir
-        exit(-1);
-    }
-
-    // Si el status del trabajo es 'E'
-    if (jobs_list[pos].status == 'E')
-    {
-
-        fprintf(stderr, "el trabajo ya esta en segundo plano \n");
-    }
-    // Sino
-    else
-    {
-        // Status pasa a 'E'
-        jobs_list[pos].status = 'E';
-
-        // Se recorre hasta el final o encontrar '&'
-        for (int i = 0; jobs_list[pos].cmd[i] != 0 &&
-                        jobs_list[pos].cmd[i] != '&';
-             i++)
+        if ((i == strlen(str) - 1) && (str[i] == '&'))
         {
-            // Si no hay '&'
-            if (jobs_list[pos].cmd[i] == '0')
+            aux[i] = '\0';
+        }
+        else
+        {
+            aux[i] = str[i];
+        }
+    }
+    return aux;
+}
+
+// Implementación del comando interno fg
+int internal_fg(char **args)
+{
+    signal(SIGTSTP, ctrlz);
+    int pos;
+    // cogemos el string y lo pasamos a un integer
+    if (args[1] != NULL)
+    {
+        sscanf(args[1], "%d", &pos);
+        if ((pos > n_pids) || (pos == 0))
+        {
+            fprintf(stderr, "fg %d: No existe ese trabajo\n", pos);
+        }
+        else
+        {
+            if (jobs_list[pos].status == 'D')
             {
-                // Se añade '&' al cmd
-                jobs_list[pos].cmd[i] = ' ';
-                jobs_list[pos].cmd[i + 1] = '&';
-                jobs_list[pos].cmd[i + 2] = 0;
+                kill(jobs_list[pos].pid, SIGCONT);
+                fprintf(stderr, "[internal_fg()→ Señal %d (SIGCONT) enviada a %d (%s)]\n", SIGCONT,
+                        jobs_list[pos].pid, jobs_list[pos].cmd);
+            }
+            // ponemos el trabajo que pasa a foreground en la posicion 0
+            jobs_list[0].pid = jobs_list[pos].pid;
+            jobs_list[0].status = jobs_list[pos].status;
+            strcpy(jobs_list[0].cmd, remove_and(jobs_list[pos].cmd));
+            // eliminar trabajo de la lista de trabajos
+            jobs_list_remove(pos);
+            fprintf(stderr, "%s\n", jobs_list[0].cmd);
+            signal(SIGTSTP, ctrlz);
+            // mientras haya un trabajo en foreground espera
+            while ((jobs_list[0].pid != 0))
+            {
+                pause();
             }
         }
     }
-    // Enviar a jobs_list[pos].pid la señal SIGCONT
-    kill(jobs_list[pos].pid, SIGCONT);
-    printf("[internal_bg()→ señal SIGCONT enviada a %d]\n",
-           jobs_list[pos].pid);
-    // Mostrar por pantalla el nº de trabajo, el PID, el estado y el cmd.
-    printf("[%d] %d\t%c\t%s\n", pos, jobs_list[pos].pid,
-           jobs_list[pos].status, jobs_list[pos].cmd);
+    else
+    {
+        fprintf(stderr, "fg: Argumentos invalidos\n");
+    }
+    return 1;
+}
 
+// Implementación del comando interno bg
+int internal_bg(char **args)
+{
+    int pos;
+    if (args[1] != NULL)
+    {
+        // cogemos el string y lo pasamos a un integer
+        sscanf(args[1], "%d", &pos);
+        if ((pos > n_pids) || (pos == 0))
+        {
+            fprintf(stderr, "bg %d: no existe ese trabajo\n", pos);
+        }
+        else
+        {
+            if (jobs_list[pos].status == 'E')
+            {
+                fprintf(stderr, "bg: El trabajo %d ya esta ejecutandose en background\n", pos);
+            }
+            else
+            {
+                kill(jobs_list[pos].pid, SIGCONT);
+                jobs_list[pos].status = 'E';
+                strcpy(jobs_list[pos].cmd, add_and(jobs_list[pos].cmd));
+                printf("[%d]%d %c %s\n", pos, jobs_list[pos].pid,
+                       jobs_list[pos].status, jobs_list[pos].cmd);
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "bg: Argumentos invalidos\n");
+    }
     return 1;
 }
 
@@ -346,9 +354,13 @@ int execute_line(char *line)
                 signal(SIGCHLD, SIG_DFL);
                 // Ignora la señal SIGINT
                 signal(SIGINT, SIG_IGN);
+                signal(SIGTSTP, SIG_IGN);
                 is_output_redirection(args);
-                execvp(args[0], args);
-                exit(-1);
+                if (execvp(args[0], args) == -1)
+                {
+                    fprintf(stderr, "%s: no se encontró la orden\n", line);
+                    exit(-1);
+                }
             }
             else if (pid > 0) // Proceso padre
             {

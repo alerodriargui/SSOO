@@ -38,7 +38,7 @@ char const PROMPT = '$';
 #include <string.h>    //strcmp(), strtok(), strerror()
 #include <unistd.h>    //NULL, getcwd(), chdir()
 #include <sys/types.h> //pid_t
-#include <sys/wait.h>  //wait()
+//#include <sys/wait.h>  //wait()
 #include <signal.h>    //signal(), SIG_DFL, SIG_IGN, SIGINT, SIGCHLD
 #include <fcntl.h>     //O_WRONLY, O_CREAT, O_TRUNC
 #include <sys/stat.h>  //S_IRUSR, S_IWUSR
@@ -77,7 +77,7 @@ int check_internal(char **args)
     if (!strcmp(args[0], "source"))
         return internal_source(args);
     if (!strcmp(args[0], "jobs"))
-        return internal_jobs();
+        return internal_jobs(args);
     if (!strcmp(args[0], "bg"))
         return internal_bg(args);
     if (!strcmp(args[0], "fg"))

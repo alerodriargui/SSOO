@@ -231,9 +231,13 @@ int execute_line(char *line)
                 // Asociar la acción por defecto a SIGCHLD
                 signal(SIGCHLD, SIG_DFL);
                 // Ignora la señal SIGINT
-                signal(SIGINT, SIG_IGN);
-                execvp(args[0], args);
-                exit(-1);
+                signal(SIGINT, SIG_IGN);  // ctrl+c
+                signal(SIGTSTP, SIG_IGN); // ctrl+z
+                if (execvp(args[0], args) == -1)
+                {
+                    fprintf(stderr, "%s: no se encontró la orden\n", line);
+                    exit(-1);
+                }
             }
             else if (pid > 0) // Proceso padre
             {

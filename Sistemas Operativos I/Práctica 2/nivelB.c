@@ -2,14 +2,14 @@
 nivelB.c
 Miembros del grupo:
     - Sergi Mayol Matos
-    - Alejandro Rodríguez Arguimbau 
+    - Alejandro Rodríguez Arguimbau
     - Nicolás Sanz Tuñón
 */
 
 #define _POSIX_C_SOURCE 200112L
 
-#define DEBUGN1 1 //parse_args()
-#define DEBUGN3 1 //execute_line()
+#define DEBUGN1 1 // parse_args()
+#define DEBUGN3 1 // execute_line()
 
 #define PROMPT_PERSONAL 1 // si no vale 1 el prompt será solo el carácter de PROMPT
 
@@ -55,16 +55,16 @@ char *read_line(char *line);
 int parse_args(char **args, char *line);
 int execute_line(char *line);
 
-static char mi_shell[COMMAND_LINE_SIZE]; //variable global para guardar el nombre del minishell
+static char mi_shell[COMMAND_LINE_SIZE]; // variable global para guardar el nombre del minishell
 
-//static pid_t foreground_pid = 0;
+// static pid_t foreground_pid = 0;
 struct info_process
 {
     pid_t pid;
     char status; // ‘N’, ’E’, ‘D’, ‘F’ (‘N’: ninguno, ‘E’: Ejecutándose y ‘D’: Detenido, ‘F’: Finalizado)
     char cmd[COMMAND_LINE_SIZE];
 };
-static struct info_process jobs_list[N_JOBS]; //Tabla de procesos. La posición 0 será para el foreground
+static struct info_process jobs_list[N_JOBS]; // Tabla de procesos. La posición 0 será para el foreground
 
 void imprimir_prompt();
 
@@ -157,10 +157,10 @@ char *read_line(char *line)
         }
     }
     else
-    { //ptr==NULL por error o eof
+    { // ptr==NULL por error o eof
         printf("\r");
         if (feof(stdin))
-        { //se ha pulsado Ctrl+D
+        { // se ha pulsado Ctrl+D
             fprintf(stderr, "Bye bye\n");
             exit(0);
         }
@@ -200,30 +200,32 @@ int execute_line(char *line) //! no finalizado falta Asociar el manejador ctrlc 
     pid_t pid, status;
     char command_line[COMMAND_LINE_SIZE];
 
-    //copiamos la línea de comandos sin '\n' para guardarlo en el array de structs de los procesos
+    // copiamos la línea de comandos sin '\n' para guardarlo en el array de structs de los procesos
     memset(command_line, '\0', sizeof(command_line));
-    strcpy(command_line, line); //antes de llamar a parse_args() que modifica line
-    //Comprobar si tenemos argumentos en nuestro comando
+    strcpy(command_line, line); // antes de llamar a parse_args() que modifica line
+    // Comprobar si tenemos argumentos en nuestro comando
     if (parse_args(args, line) > 0)
     {
-        //Se identifica si se trata de un comando interno o externo
+        // Se identifica si se trata de un comando interno o externo
         if (!check_internal(args))
         {
-            //Se crea un hijo con fork(), para que se encargue de que se ejecute el comando de forma externa.
+            // Se crea un hijo con fork(), para que se encargue de que se ejecute el comando de forma externa.
             pid = fork();
-            //Proceso hijo
+            // Proceso hijo
             if (pid == 0)
             {
-                //Asociar la acción por defecto a SIGCHLD
+                // Asociar la acción por defecto a SIGCHLD
                 signal(SIGCHLD, SIG_DFL);
-                //Ignora la señal SIGINT
+                // Ignora la señal SIGINT
                 signal(SIGINT, SIG_IGN);
                 fprintf(stderr, "[execute_line()→ PID hijo: %d(%s)]\n", getpid(), args[0]);
-                execvp(args[0], args);
-                fprintf(stderr, "%s: no se encontró la orden\n", line);
-                exit(-1);
+                if (execvp(args[0], args) == -1)
+                {
+                    fprintf(stderr, "%s: no se encontró la orden\n", line);
+                    exit(-1);
+                }
             }
-            else if (pid > 0) //Proceso padre
+            else if (pid > 0) // Proceso padre
             {
                 fprintf(stderr, "[execute_line()→ PID padre: %d(%s)]\n", getpid(), mi_shell);
                 jobs_list[0].pid = pid;
@@ -236,24 +238,24 @@ int execute_line(char *line) //! no finalizado falta Asociar el manejador ctrlc 
             else
             {
                 fprintf(stderr, "Error %d: %s\n", errno, strerror(errno));
-                //perror("Fork");
+                // perror("Fork");
             }
         }
     }
     return 0;
 }
 
-//Manejador propio para la señal SIGCHLD (señal enviada a un proceso cuando uno
-//de sus procesos hijos termina), también denominado enterrador de hijos.
+// Manejador propio para la señal SIGCHLD (señal enviada a un proceso cuando uno
+// de sus procesos hijos termina), también denominado enterrador de hijos.
 void reaper(int signum)
 {
     int status;
     pid_t ended;
     signal(SIGCHLD, reaper);
-    //Analizamos el valor de waitpid para saber que hijo termina
+    // Analizamos el valor de waitpid para saber que hijo termina
     while ((ended = waitpid(-1, &status, WNOHANG)) > 0)
     {
-        //En este nivel mostraremos un mensaje indicando el PID del hijo que ha finalizado y si ha sido por una señal.
+        // En este nivel mostraremos un mensaje indicando el PID del hijo que ha finalizado y si ha sido por una señal.
         if (WIFEXITED(status))
         {
             fprintf(stderr, "\n[reaper()→ Proceso hijo %d(%s) finalizado con exit code %d]\n", ended, jobs_list[0].cmd, WEXITSTATUS(status));
@@ -262,26 +264,26 @@ void reaper(int signum)
         {
             fprintf(stderr, "[reaper()→ Proceso hijo %d(%s) finalizado por señal %d]\n", ended, jobs_list[0].cmd, WTERMSIG(status));
         }
-        //Reseteo de jobs_list
+        // Reseteo de jobs_list
         jobs_list[0].pid = 0;
         jobs_list[0].status = 'F';
         strcpy(jobs_list[0].cmd, "");
     }
 }
 
-//Manejador propio para la señal SIGINT (Ctrl+C).
+// Manejador propio para la señal SIGINT (Ctrl+C).
 void ctrlc(int signum)
 {
-    //Llamada a la función signal asociandola a la misma funcion porque en algunos sistemas
-    //una vez capturada por primera vez, se restaura a la acción por defecto.
+    // Llamada a la función signal asociandola a la misma funcion porque en algunos sistemas
+    // una vez capturada por primera vez, se restaura a la acción por defecto.
     signal(SIGINT, ctrlc);
-    //Si hay un proceso en foreground
+    // Si hay un proceso en foreground
     if (jobs_list[0].pid > 0)
     {
-        //Si el proceso en foreground NO es el mini shell, ya que puedo haber ejecutado el minishell  dentro del minishell
+        // Si el proceso en foreground NO es el mini shell, ya que puedo haber ejecutado el minishell  dentro del minishell
         if (strcmp(jobs_list[0].cmd, mi_shell))
         {
-            //Enviar la señal SIGTERM y notificarlo por pantalla.
+            // Enviar la señal SIGTERM y notificarlo por pantalla.
             fprintf(stderr, "[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
                     getpid(), mi_shell, jobs_list[0].pid, jobs_list[0].cmd);
             printf("[ctrlc()→ Señal %d enviada a %d(%s) por %d(%s)]", SIGTERM, jobs_list[0].pid, jobs_list[0].cmd, getpid(), mi_shell);
@@ -289,7 +291,7 @@ void ctrlc(int signum)
         }
         else
         {
-            //Informar del proceso y del error producido
+            // Informar del proceso y del error producido
             fprintf(stderr, "[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d (%s)]\n",
                     getpid(), mi_shell, jobs_list[0].pid, jobs_list[0].cmd);
             fprintf(stderr, "[ctrlc()→ Señal %d no enviada por %d(%s) debido a que su proceso en foreground es el shell]",
@@ -298,26 +300,26 @@ void ctrlc(int signum)
     }
     else
     {
-        //Informar del proceso y del error producido
+        // Informar del proceso y del error producido
         fprintf(stderr, "\n[ctrlc()→ Soy el proceso con PID %d(%s), el proceso en foreground es %d(%s)]\n",
                 getpid(), mi_shell, jobs_list[0].pid, jobs_list[0].cmd);
         fprintf(stderr, "[ctrlc()→ Señal %d no enviada por %d(%s)] debido a que no hay proceso en foreground]",
                 SIGTERM, getpid(), mi_shell);
     }
-    //Salto de linea seguido de un fflush(stdout) para forzar el vaciado del buffer de salida
+    // Salto de linea seguido de un fflush(stdout) para forzar el vaciado del buffer de salida
     printf("\n");
     fflush(stdout);
 }
 
 int main(int argc, char *argv[])
 {
-    //llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
+    // llamada al enterrador de zombies cuando un hijo acaba (señal SIGCHLD)
     signal(SIGCHLD, reaper);
-    //SIGINT es la señal de interrupción que produce Ctrl+C
+    // SIGINT es la señal de interrupción que produce Ctrl+C
     signal(SIGINT, ctrlc);
-    //Obtenemos nombre del programa y lo guardamos en mi_shell
+    // Obtenemos nombre del programa y lo guardamos en mi_shell
     strcpy(mi_shell, argv[0]);
-    //Inicializacion de jobs_list[0] con pid = 0 status = 'N' y el cmd todo a '\0'
+    // Inicializacion de jobs_list[0] con pid = 0 status = 'N' y el cmd todo a '\0'
     jobs_list[0].pid = 0;
     jobs_list[0].status = 'N';
     strcpy(jobs_list[0].cmd, "");
