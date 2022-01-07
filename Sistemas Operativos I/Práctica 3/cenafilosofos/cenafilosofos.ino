@@ -41,10 +41,10 @@ static SemaphoreHandle_t chopstick[NUM_OF_PHILOSOPHERS];
 
 // The only task: eating
 void eat(void *parameters) {
-
+  vTaskDelay(ESPERA / portTICK_PERIOD_MS);
   int num;
   char buf[50];
-  long randomNumber = random(0, ESPERA);
+  int randomNumber = random(0, ESPERA);
   // Copiar parámetro e incrementar el contador de semáforos
   num = *(int *)parameters;
   xSemaphoreGive(bin_sem);
@@ -62,9 +62,6 @@ void eat(void *parameters) {
   sprintf(buf, "Filósofo %i: ¡o", num);
   Serial.println(buf);
 
-  // Add some delay to force deadlock
-  //vTaskDelay(1 / portTICK_PERIOD_MS);
-
   //Cuando un filósofo ha cogido el palillo de la izquierda,  
   //pasa un tiempo aleatorio pensando en sus cosas de entre 0 y ESPERA 
   //(el tiempo de espera definido en el código) hasta coger el de su derecha .
@@ -75,17 +72,19 @@ void eat(void *parameters) {
   sprintf(buf, "Filósofo %i: ¡o¡", num);
   Serial.println(buf);
 
- //Antes de decidirse a comer, 
- //todos los filósofos pasan un tiempo aleatorio pensando entre 0 y ESPERA.
-  vTaskDelay(randomNumber / portTICK_PERIOD_MS);
-
   // El filósofo i se ha sentado a comer
   sprintf(buf, "Filósofo %i: |▄|", num);
   Serial.println(buf);
+   
+ //Antes de decidirse a comer, 
+ //todos los filósofos pasan un tiempo aleatorio pensando entre 0 y ESPERA.
+  vTaskDelay(randomNumber / portTICK_PERIOD_MS);
+   
   // El filósofo i come
   sprintf(buf, "Filósofo %i: ÑAM", num);
-  Serial.println(buf);
+  // Los filósofos pasan un tiempo aleatorio (de entre 0 y ESPERA) comiendo. 
   vTaskDelay(randomNumber / portTICK_PERIOD_MS);
+  Serial.println(buf);
 
   // El filósofo i deja el palillo derecho
   xSemaphoreGive(chopstick[(num+1)%NUM_OF_PHILOSOPHERS]);
@@ -105,17 +104,18 @@ void eat(void *parameters) {
   vTaskDelete(NULL);
 }
 
-//*****************************************************************************
-// Main (runs as its own task with priority 1 on core 1)
+
+// Main 
 
 void setup() {
 
   char task_name[20];
   // Configurar serial
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   // Esperar un momento para no perder ningún dato
   vTaskDelay(1000 / portTICK_PERIOD_MS);
+    Serial.println("------ Cena de filósofos ------");
     Serial.println("@ filósofo 0");
     Serial.println("@ filósofo 1");
     Serial.println("@ filósofo 2");
@@ -130,8 +130,10 @@ void setup() {
     chopstick[i] = xSemaphoreCreateMutex();
   }
 
+  while(MAX_NUMBER_ALLOWED) {
   // Have the philosphers start eating
   for (int i = 0; i < NUM_OF_PHILOSOPHERS; i++) {
+ 
     sprintf(task_name, "Philosopher %i", i);
     xTaskCreatePinnedToCore(eat,
                             task_name,
@@ -141,15 +143,14 @@ void setup() {
                             NULL,
                             app_cpu);
     xSemaphoreTake(bin_sem, portMAX_DELAY);
-  }
+  }        
 
-
-  // Wait until all the philosophers are done
+  // Esperar hasta que todos los filósfos hayan comido
   for (int i = 0; i < NUM_OF_PHILOSOPHERS; i++) {
     xSemaphoreTake(done_sem, portMAX_DELAY);
   }
-
-  // Say that we made it through without deadlock
+}
+  // Print para saber que no se ha producido deadlock en todo el programa
   Serial.println("\nNO ha habido deadlock, el programa ha finalizado!");
 }
 
