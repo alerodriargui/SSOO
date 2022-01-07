@@ -32,24 +32,24 @@ static const BaseType_t app_cpu = 1;
 enum { TASK_STACK_SIZE = 2048 };  // Bytes in ESP32, words in vanilla FreeRTOS
 
 // Globals
-static SemaphoreHandle_t bin_sem;   // Wait for parameters to be read
-static SemaphoreHandle_t done_sem;  // Notifies main task when done
-static SemaphoreHandle_t chopstick[NUM_OF_PHILOSOPHERS];
+static SemaphoreHandle_t semaforo_bin;   // Esperar a que se lean los parámetros
+static SemaphoreHandle_t semaforo_listo;  // Notifica cuando termina la tarea principal
+static SemaphoreHandle_t palillo[NUM_OF_PHILOSOPHERS];
 
 //*****************************************************************************
-// Tasks
+// Tareas
 
-// The only task: eating
-void eat(void *parameters) {
+// Método para comer 
+void comer(void *param) {
   vTaskDelay(ESPERA / portTICK_PERIOD_MS);
   int num;
   char buf[50];
-  int randomNumber = random(0, ESPERA);
+  int randomNumber = random(0, ESPERA); //Número random entre 0 y 200
   // Copiar parámetro e incrementar el contador de semáforos
-  num = *(int *)parameters;
-  xSemaphoreGive(bin_sem);
+  num = *(int *)param;
+  xSemaphoreGive(semaforo_bin);
 
-  // El filósofo i quiere sentarse a comer
+  // El filósofo i quiere entrar a comer
   sprintf(buf, "Filósofo %i: TOC TOC", num);
   Serial.println(buf);
 
@@ -58,22 +58,18 @@ void eat(void *parameters) {
   Serial.println(buf);
   
   // El filósofo i coge el palillo izquierdo
-  xSemaphoreTake(chopstick[num], portMAX_DELAY);
+  xSemaphoreTake(palillo[num], portMAX_DELAY);
   sprintf(buf, "Filósofo %i: ¡o", num);
   Serial.println(buf);
 
   //Cuando un filósofo ha cogido el palillo de la izquierda,  
   //pasa un tiempo aleatorio pensando en sus cosas de entre 0 y ESPERA 
-  //(el tiempo de espera definido en el código) hasta coger el de su derecha .
+  //(el tiempo de espera definido en el código) hasta coger el de su derecha.
   vTaskDelay(randomNumber / portTICK_PERIOD_MS);
   
   // El filósofo i coge el palillo derecho
-  xSemaphoreTake(chopstick[(num+1)%NUM_OF_PHILOSOPHERS], portMAX_DELAY);
+  xSemaphoreTake(palillo[(num+1)%NUM_OF_PHILOSOPHERS], portMAX_DELAY);
   sprintf(buf, "Filósofo %i: ¡o¡", num);
-  Serial.println(buf);
-
-  // El filósofo i se ha sentado a comer
-  sprintf(buf, "Filósofo %i: |▄|", num);
   Serial.println(buf);
    
  //Antes de decidirse a comer, 
@@ -87,17 +83,17 @@ void eat(void *parameters) {
   Serial.println(buf);
 
   // El filósofo i deja el palillo derecho
-  xSemaphoreGive(chopstick[(num+1)%NUM_OF_PHILOSOPHERS]);
+  xSemaphoreGive(palillo[(num+1)%NUM_OF_PHILOSOPHERS]);
   sprintf(buf, "Filósofo %i: ¡o_", num);
   Serial.println(buf);
 
   // El filósofo i deja el palillo izquierdo
-  xSemaphoreGive(chopstick[num]);
+  xSemaphoreGive(palillo[num]);
   sprintf(buf, "Filósofo %i: _o", num);
   Serial.println(buf);
 
-  // Notify main task and delete self
-  if (xSemaphoreGive(done_sem)) {
+  // Notificar que ha acabado y eliminarse
+  if (xSemaphoreGive(semaforo_listo)) {
     sprintf(buf, "Filósofo %i: |_|", num);
   Serial.println(buf);
   }
@@ -109,7 +105,7 @@ void eat(void *parameters) {
 
 void setup() {
 
-  char task_name[20];
+  char tarea[20];
   // Configurar serial
   Serial.begin(9600);
 
@@ -123,31 +119,31 @@ void setup() {
     Serial.println("@ filósofo 4");
   
 
-  // Create kernel objects before starting tasks
-  bin_sem = xSemaphoreCreateBinary();
-  done_sem = xSemaphoreCreateCounting(NUM_OF_PHILOSOPHERS, 0);
+  // Crear los objetos del kernel antes de iniciar las tareas
+  semaforo_bin = xSemaphoreCreateBinary();
+  semaforo_listo = xSemaphoreCreateCounting(MAX_NUMBER_ALLOWED, 0);
   for (int i = 0; i < NUM_OF_PHILOSOPHERS; i++) {
-    chopstick[i] = xSemaphoreCreateMutex();
+    palillo[i] = xSemaphoreCreateMutex();
   }
 
-  while(MAX_NUMBER_ALLOWED) {
-  // Have the philosphers start eating
+	while(MAX_NUMBER_ALLOWED) {
+  // Los filósofos empiezan a comer
   for (int i = 0; i < NUM_OF_PHILOSOPHERS; i++) {
  
-    sprintf(task_name, "Philosopher %i", i);
-    xTaskCreatePinnedToCore(eat,
-                            task_name,
+    sprintf(tarea, "Philosopher %i", i);
+    xTaskCreatePinnedToCore(comer,
+                            tarea,
                             TASK_STACK_SIZE,
                             (void *)&i,
                             1,
                             NULL,
                             app_cpu);
-    xSemaphoreTake(bin_sem, portMAX_DELAY);
+    xSemaphoreTake(semaforo_bin, portMAX_DELAY);
   }        
 
   // Esperar hasta que todos los filósfos hayan comido
   for (int i = 0; i < NUM_OF_PHILOSOPHERS; i++) {
-    xSemaphoreTake(done_sem, portMAX_DELAY);
+    xSemaphoreTake(semaforo_listo, portMAX_DELAY);
   }
 }
   // Print para saber que no se ha producido deadlock en todo el programa
@@ -155,5 +151,5 @@ void setup() {
 }
 
 void loop() {
-  // Do nothing in this task
+  // No hacer nada aquí
 }
