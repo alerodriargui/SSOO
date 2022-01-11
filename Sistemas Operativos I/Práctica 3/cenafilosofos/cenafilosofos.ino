@@ -1,19 +1,19 @@
 /**
-   Significado mensajes:
-  TOC TOC → quiere entrar a comer
-  |▄|    → se ha sentado a comer
+   Significado de los mensajes:
+  TOC TOC → quiere entrar al comedor
+  |▄|     → se ha sentado a comer
   ¡o      → coge palillo izquierdo
   ¡o¡     → coge palillo derecho
   /o\ ÑAM → está comiendo
   ¡o_     → suelta palillo derecho
   _o      → suelta palillo izquierdo
-  |_|     → sale de comer
+  |_|     → sale del comedor
 */
 
-// Només fem servir el nucli app_cpu per simplicitat
-// i tenint en compte que alguns esp32 són unicore
-// unicore    -> app_cpu = 0
-// 2 core  -> app_cpu = 1 (prog_cpu = 0)
+// Solamente usamos el nucleo app_cpu por simplicidad
+// y teniendo en cuenta que algunos esp32 son unicore
+// esp32 unicore -> app_cpu = 0
+// esp32 2 core  -> app_cpu = 1 (prog_cpu = 0)
 
 #if CONFIG_FREERTOS_UNICORE
 static const BaseType_t app_cpu = 0;
@@ -22,16 +22,16 @@ static const BaseType_t app_cpu = 1;
 #endif
 //#define INCLUDE_vTaskSuspend    1    //ja està posat per defecte sino descomentar es el temps de espera                //infinit als semàfors
 
-/*************************** Variables Globals i definicions **************************************/
+/*************************** Variables Globales y definiciones **************************************/
 
-#define NUM_OF_PHILOSOPHERS 5                         //Nombre de filòsofs
-#define MAX_NUMBER_ALLOWED (NUM_OF_PHILOSOPHERS - 1)  // Màxim nombre de filòsofs a l'habitació  (un menys que el total per evitar deadlock)
-#define ESPERA 200  //interval d'espera de vTaskDelay
+#define NUM_OF_PHILOSOPHERS 5                         //Número de filósofos
+#define MAX_NUMBER_ALLOWED (NUM_OF_PHILOSOPHERS - 1)  //Número máximo de filósofos en el comedor  (uno menos que el total para evitar deadlock)
+#define ESPERA 200  //tiempo de espera de vTaskDelay
 
 // Settings
 enum { TASK_STACK_SIZE = 2048 };  // Bytes in ESP32, words in vanilla FreeRTOS
 
-// Globals
+// Globales
 static SemaphoreHandle_t semaforo_bin;   // Esperar a que se lean los parámetros
 static SemaphoreHandle_t semaforo_listo;  // Notifica cuando termina la tarea principal
 static SemaphoreHandle_t palillo[NUM_OF_PHILOSOPHERS];
@@ -41,6 +41,8 @@ static SemaphoreHandle_t palillo[NUM_OF_PHILOSOPHERS];
 
 // Método para comer 
 void comer(void *param) {
+  //Espera dividida por la macro para que la espera
+  //sea en tiempo real
   vTaskDelay(ESPERA / portTICK_PERIOD_MS);
   int num;
   char buf[50];
@@ -108,6 +110,11 @@ void setup() {
   char tarea[20];
   // Configurar serial
   Serial.begin(9600);
+
+  //Establecemos semilla en un pin analógico para
+  //que la secuencia de num aleatorios sea 
+  //siempre distinta
+  randomSeed(analogRead(A0));
 
   // Esperar un momento para no perder ningún dato
   vTaskDelay(1000 / portTICK_PERIOD_MS);
