@@ -1,4 +1,9 @@
 /**
+   Autores de la práctica:
+   - Alejandro Rodríguez Arguimbau
+   - Sergi Mayol Matos
+   - Nicolás Sanz Tuñón
+  
    Significado de los mensajes:
   TOC TOC → quiere entrar al comedor
   |▄|     → se ha sentado a comer
